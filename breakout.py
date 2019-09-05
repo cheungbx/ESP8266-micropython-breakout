@@ -5,8 +5,8 @@ import utime
 from utime import sleep_us, ticks_ms, ticks_us, ticks_diff
 import time
 from time import sleep
-from machine import Pin, I2C,PWM
-
+from machine import Pin, I2C,PWM, ADC
+from math import sqrt
 import os
 import sys
 import ssd1306
@@ -25,7 +25,6 @@ btnUp = Pin(14, Pin.IN, Pin.PULL_UP)
 btnDown = Pin(2, Pin.IN, Pin.PULL_UP)
 btnA = Pin(0, Pin.IN, Pin.PULL_UP)
 buzzer = Pin(15, Pin.OUT)
-
 
 tones = {
     'c4': 262,
@@ -92,7 +91,6 @@ class Ball(object):
         self.max_y_speed = 3
         self.frozen = frozen
         self.display = display
-#        self.sprite = display.load_sprite('images/Ball7x7.raw', width, height)
         self.x_speed = x_speed
         self.y_speed = y_speed
         self.x_speed2 = 0.0
@@ -156,8 +154,7 @@ class Ball(object):
             ratio = ((self.x + self.center) -
                      (paddle_x + paddle_center)) / paddle_center
             self.x_speed = ratio * self.max_x_speed
-            self.y_speed = -sqrt(max(1, self.max_y_speed ** 2 -
-                                     self.x_speed ** 2))
+            self.y_speed = -sqrt(max(1, self.max_y_speed ** 2 - self.x_speed ** 2))
 
         self.x2 = self.x + self.width - 1
         self.y2 = self.y + self.height - 1
@@ -295,8 +292,6 @@ class Paddle(object):
         self.height = height
         self.center = width // 2
         self.display = display
-        self.sprite = display.load_sprite('images/Paddle25x8.raw',
-                                          width, height)
 
     def clear(self):
         """Clear paddle."""
@@ -304,7 +299,7 @@ class Paddle(object):
 
     def draw(self):
         """Draw paddle."""
-        self.display.fill_rect(self.sprite, self.x, self.y,
+        self.display.fill_rect(self.x, self.y,
                                  self.width, self.height,1)
 
     def h_position(self, x):
@@ -368,7 +363,7 @@ class Powerup(object):
     def draw(self):
         """Draw power-up."""
         self.clear_previous()
-        self.display.fill_rect(self.sprite, self.x, self.y, self.width, self.height,1)
+        self.display.fill_rect(self.x, self.y, self.width, self.height,1)
 
     def set_position(self, paddle_x, paddle_y, paddle_x2, paddle_center):
         """Set power-up position."""
@@ -423,38 +418,20 @@ class Score(object):
 
 
 def load_level(level, display):
-    """Load level brick coordinates and colors from bin file.
-
-    Notes:
-        Level file consists of 5 values for each brick:
-            x, y, x2, y2, color(index)
-    """
+  
     bricks = []
-    brick_colors = ['Red', 'Yellow', 'Blue', 'Pink', 'Green']
-    path = 'Level{0:03d}.bin'.format(level)
-    level_size = stat(path)[6]
-    level = bytearray(level_size)
-    with open(path, 'rb') as f:
-        f.readinto(level)
-
-    for i in range(0, level_size, 3):
-        bricks.append(Brick(level[i],
-                            level[i + 1],
-                            brick_colors[level[i + 2]],
-                            display))
+    for row in range(12, 28, 4):
+        brick_color = 1
+        for col in range(16, 112, 12):
+            bricks.append(col, row, brick_color, display)
     return bricks
-
+    
 
 def main():
     """Initialize display."""
-    # Baud rate of 14500000 seems about the max
-    spi = SPI(2, baudrate=14500000, sck=Pin(18), mosi=Pin(23))
-    display = Display(spi, dc=Pin(17), cs=Pin(5), rst=Pin(16))
-
-    # Draw background image
  
     # Initialize ADC on pin A0
-    adc = ADC(Pin(A0))
+    adc = ADC(0)
     # Set attenuation 0-2V (Will use resistor to limit pot to 2V).
     # adc.atten(ADC.ATTN_6DB)
 
@@ -584,6 +561,7 @@ def main():
                     level = 1
                 bricks = load_level(level, display)
                 balls.append(Ball(59, 111, -2, -1, display, frozen=True))
+            display.show()
             # Attempt to set framerate to 30 FPS
             timer_dif = 33333 - ticks_diff(ticks_us(), timer)
             if timer_dif > 0:
@@ -593,3 +571,4 @@ def main():
 
 
 main()
+
