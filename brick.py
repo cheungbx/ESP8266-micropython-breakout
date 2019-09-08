@@ -12,6 +12,7 @@ from random import getrandbits, seed
 #--------- pin layout
 SCREEN_WIDTH  = const(128)
 SCREEN_HEIGHT = const(64)
+paddle_width = 22
 btnLeft = Pin(12, Pin.IN, Pin.PULL_UP)
 btnRight = Pin(13, Pin.IN, Pin.PULL_UP)
 btnUp = Pin(14, Pin.IN, Pin.PULL_UP)
@@ -272,7 +273,7 @@ class Life(object):
 class Paddle(object):
     """Paddle."""
 
-    def __init__(self, display, width=20, height=3):
+    def __init__(self, display, width, height):
         """Initialize paddle.
 
         Args:
@@ -304,10 +305,11 @@ class Paddle(object):
         Args:
             x (int):  X coordinate.
         """
-        if(x != self.x):  # Check if paddle moved
+        new_x = max(3,min (x, 125-self.width))
+        if new_x != self.x :  # Check if paddle moved
             prev_x = self.x  # Store previous x position
-            self.x = x
-            self.x2 = x + self.width - 1
+            self.x = new_x
+            self.x2 = self.x + self.width - 1
             self.y2 = self.y + self.height - 1
             self.draw()
             # Clear previous paddle
@@ -354,8 +356,8 @@ class Score(object):
         self.value += points
         self.draw()
   
-def load_level(level, display):
-  
+def load_level(level, display) :
+
     bricks = []
     for row in range(12, 20 + 6 * level , 6):
         brick_color = 1
@@ -363,155 +365,179 @@ def load_level(level, display):
             bricks.append(Brick(col, row, brick_color, display))    
     return bricks
     
-
-def main():
     
- 
 
 
-    # Seed random numbers
-    seed(ticks_us())
-    while True :
+
+# Seed random numbers
+seed(ticks_us())
+while True :
+
+    gc.collect()
+    print (gc.mem_free())
     
-        gc.collect()
-        print (gc.mem_free())
-        
-        # configure oled display I2C SSD1306
-        i2c = I2C(-1, Pin(5), Pin(4))   # SCL, SDA
+    # configure oled display I2C SSD1306
+    i2c = I2C(-1, Pin(5), Pin(4))   # SCL, SDA
 
-        display = ssd1306.SSD1306_I2C(128, 64, i2c)
-        # ESP8266 ADC A0 values 0-1023
-        adc = ADC(0)
-        display.fill(0)
+    display = ssd1306.SSD1306_I2C(128, 64, i2c)
+    # ESP8266 ADC A0 values 0-1023
+    adc = ADC(0)
+    display.fill(0)
+
+    display.text('BREAKOUT', 5, 0, 1)
+    display.text('L = Button', 5, 30, 1)
+    display.text('R = Paddle', 5, 45,  1)
+    display.show()
+    while (btnLeft.value() and btnRight.value()):
+        sleep_us(1000)
+    usePaddle = not btnRight.value()
+    
+    display.fill(0)
+     
+    # Generate bricks
+    MAX_LEVEL = const(5)
+    level = 1
+    bricks = load_level(level, display)
+
+    # Initialize paddle
+    paddle = Paddle(display, paddle_width, 3)
+
+    # Initialize score
+    score = Score(display)
+
+    # Initialize balls
+    balls = []
+    # Add first ball
+    balls.append(Ball(59, 58, -2, -1, display, frozen=True))
+
+    # Initialize lives
+    lives = []
+    for i in range(1, 3):
+        lives.append(Life(i, display))
+    print (len(lives))
+    
+    prev_paddle_vect = 0
+   
+    gameover = False
+    display.show()
 
 
-        # Generate bricks
-        MAX_LEVEL = const(5)
-        level = 1
-        bricks = load_level(level, display)
-
-        # Initialize paddle
-        paddle = Paddle(display)
-
-        # Initialize score
-        score = Score(display)
-
-        # Initialize balls
-        balls = []
-        # Add first ball
-        balls.append(Ball(59, 58, -2, -1, display, frozen=True))
-
-        # Initialize lives
-        lives = []
-        for i in range(1, 3):
-            lives.append(Life(i, display))
-        print (len(lives))
-       
-        gameover = False
-        display.show()
 
 
-
- 
-        try:
-            while not gameover :
-                timer = ticks_us()
+    try:
+        while not gameover :
+            timer = ticks_us()
+            if usePaddle :
                 # Set paddle position to ADC spinner (scale 1 - 107)
                 paddle.h_position(int(adc.read() // 9.57))
-                # Handle balls
-                score_points = 0
+            else :
+                paddle_vect = 0
+                if not btnLeft.value():
+                  paddle_vect = -1                      
+                if not btnRight.value():
+                  paddle_vect = 1   
+                if paddle_vect != prev_paddle_vect :
+                  paddle_vect *= 3
+                else :
+                  paddle_vect *= 5
+                paddle.h_position(paddle.x + paddle_vect)
+                prev_paddle_vect = paddle_vect
+                  
+             # Handle balls
+            score_points = 0
+            for ball in balls:
+                # move ball and check if bounced off walls and paddle 
+                if ball.set_position(paddle.x, paddle.y,paddle.x2, paddle.center):
+                    playSound(2000, 10, 0.001)     
+                # Check for collision with bricks if not frozen
+                if not ball.frozen:
+                    prior_collision = False
+                    ball_x = ball.x
+                    ball_y = ball.y
+                    ball_x2 = ball.x2
+                    ball_y2 = ball.y2
+                    ball_center_x = ball.x + ((ball.x2 + 1 - ball.x) // 2)
+                    ball_center_y = ball.y + ((ball.y2 + 1 - ball.y) // 2)
+                    
+                    # Check for hits
+                    for brick in bricks:
+                        if(ball_x2 >= brick.x and
+                           ball_x <= brick.x2 and
+                           ball_y2 >= brick.y and
+                           ball_y <= brick.y2):
+                            # Hit
+                            if not prior_collision:
+                                ball.x_speed, ball.y_speed = brick.bounce(
+                                    ball.x,
+                                    ball.y,
+                                    ball.x2,
+                                    ball.y2,
+                                    ball.x_speed,
+                                    ball.y_speed,
+                                    ball_center_x,
+                                    ball_center_y)
+                                playTone('c6', 10, 0.001)    
+                                prior_collision = True
+                            score_points += 1
+                            brick.clear()
+                            bricks.remove(brick)
+
+                # Check for missed
+                if ball.y2 > display.height - 2:
+                    ball.clear_previous()
+                    balls.remove(ball)
+                    if not balls:
+                        # Lose life if last ball on screen
+                        if len(lives) == 0:
+                            score.game_over()
+                            playTone('g4', 500, 1)
+                            playTone('c5', 500, 0.5)
+                            playTone('f4', 500, 1)
+                            gameover = True
+                        else:
+                            # Subtract Life
+                            lives.pop().clear()
+                            # Add ball
+                            balls.append(Ball(59, 58, 2, -3, display,
+                                         frozen=True))
+                else:
+                    # Draw ball
+                    ball.draw()
+            # Update score if changed
+            if score_points:
+                score.increment(score_points)
+            
+            # Check for level completion
+            if not bricks:
                 for ball in balls:
-                    # move ball and check if bounced off walls and paddle 
-                    if ball.set_position(paddle.x, paddle.y,paddle.x2, paddle.center):
-                        playSound(2000, 10, 0.001)     
-                    # Check for collision with bricks if not frozen
-                    if not ball.frozen:
-                        prior_collision = False
-                        ball_x = ball.x
-                        ball_y = ball.y
-                        ball_x2 = ball.x2
-                        ball_y2 = ball.y2
-                        ball_center_x = ball.x + ((ball.x2 + 1 - ball.x) // 2)
-                        ball_center_y = ball.y + ((ball.y2 + 1 - ball.y) // 2)
-                        
-                        # Check for hits
-                        for brick in bricks:
-                            if(ball_x2 >= brick.x and
-                               ball_x <= brick.x2 and
-                               ball_y2 >= brick.y and
-                               ball_y <= brick.y2):
-                                # Hit
-                                if not prior_collision:
-                                    ball.x_speed, ball.y_speed = brick.bounce(
-                                        ball.x,
-                                        ball.y,
-                                        ball.x2,
-                                        ball.y2,
-                                        ball.x_speed,
-                                        ball.y_speed,
-                                        ball_center_x,
-                                        ball_center_y)
-                                    playTone('c6', 10, 0.001)    
-                                    prior_collision = True
-                                score_points += 1
-                                brick.clear()
-                                bricks.remove(brick)
+                    ball.clear()
+                balls.clear()
+                level += 1
+                paddle_width -=2
+                if level > MAX_LEVEL:
+                    level = 1
+                bricks = load_level(level, display)
+                balls.append(Ball(59, 58, -2, -1, display, frozen=True))
+                playTone('c5', 20, 0.02)
+                playTone('d5', 20, 0.02)
+                playTone('e5', 20, 0.02)
+                playTone('f5', 20, 0.02)
+                playTone('g5', 20, 0.02)
+                playTone('a5', 20, 0.02)                  
+                playTone('b5', 20, 0.02)
+                playTone('c6', 20, 0.02)         
+            display.show()
+            # Attempt to set framerate to 50 FPS
+            timer_dif = 1000000 / 60 - ticks_diff(ticks_us(), timer)
+            if timer_dif > 0:
+                sleep_us(timer_dif)
+    except KeyboardInterrupt:
+        display.cleanup()
+    
+    while btnA.value():
+        sleep_us(1000)
 
-                    # Check for missed
-                    if ball.y2 > display.height - 2:
-                        ball.clear_previous()
-                        balls.remove(ball)
-                        if not balls:
-                            # Lose life if last ball on screen
-                            if len(lives) == 0:
-                                score.game_over()
-                                playTone('g4', 500, 1)
-                                playTone('c5', 500, 0.5)
-                                playTone('f4', 500, 1)
-                                gameover = True
-                            else:
-                                # Subtract Life
-                                lives.pop().clear()
-                                # Add ball
-                                balls.append(Ball(59, 58, 2, -3, display,
-                                             frozen=True))
-                    else:
-                        # Draw ball
-                        ball.draw()
-                # Update score if changed
-                if score_points:
-                    score.increment(score_points)
-                
-                # Check for level completion
-                if not bricks:
-                    for ball in balls:
-                        ball.clear()
-                    balls.clear()
-                    level += 1
-                    if level > MAX_LEVEL:
-                        level = 1
-                    bricks = load_level(level, display)
-                    balls.append(Ball(59, 58, -2, -1, display, frozen=True))
-                    playTone('c5', 20, 0.02)
-                    playTone('d5', 20, 0.02)
-                    playTone('e5', 20, 0.02)
-                    playTone('f5', 20, 0.02)
-                    playTone('g5', 20, 0.02)
-                    playTone('a5', 20, 0.02)                  
-                    playTone('b5', 20, 0.02)
-                    playTone('c6', 20, 0.02)         
-                display.show()
-                # Attempt to set framerate to 50 FPS
-                timer_dif = 1000000 / 60 - ticks_diff(ticks_us(), timer)
-                if timer_dif > 0:
-                    sleep_us(timer_dif)
-        except KeyboardInterrupt:
-            display.cleanup()
-        
-        while btnA.value():
-            sleep_us(1000)
 
-main()
 
 
 
