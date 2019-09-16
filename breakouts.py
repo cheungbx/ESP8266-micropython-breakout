@@ -1,9 +1,9 @@
 # ----------------------------------------------------------
-#  Breakout Game 
+#  Breakout Game
 #  ESP8266 (node MCU D1 mini)  micropython
 # by Billy Cheung  2019 08 31
 #
-# SPI OLED 
+# SPI OLED
 # GND
 # VCC
 # D0/Sck - D5 (=GPIO14=HSCLK)
@@ -19,7 +19,7 @@
 # GPIO4    D2——   On to read ADC for Paddle
 #
 # buttons   A0
-# A0 VCC-9K-U-9K-L-12K-R-9K-D-9K-A-12K-B-9K-GND 
+# A0 VCC-9K-U-9K-L-12K-R-9K-D-9K-A-12K-B-9K-GND
 import gc
 import sys
 gc.collect()
@@ -34,19 +34,19 @@ from random import getrandbits, seed
 
 # configure oled display SPI SSD1306
 hspi = SPI(1, baudrate=8000000, polarity=0, phase=0)
-#DC, RES, CS 
-display = ssd1306.SSD1306_SPI(128, 64, hspi, Pin(2), Pin(16), Pin(0)) 
+#DC, RES, CS
+display = ssd1306.SSD1306_SPI(128, 64, hspi, Pin(2), Pin(16), Pin(0))
 
 
 
 #---buttons
 
-btnU = 1
-btnL = 2
-btnR = 3
-btnD = 4
-btnA = 5
-btnB = 6
+btnU = const (1 << 1)
+btnL = const (1 << 2)
+btnR = const (1 << 3)
+btnD = const (1 << 4)
+btnA = const (1 << 5)
+btnB = const (1 << 6)
 
 Btns = 0
 lastBtns = 0
@@ -60,23 +60,23 @@ buzzer = Pin(15, Pin.OUT)
 adc = ADC(0)
 
 def getPaddle () :
-  pinPaddle.on() 
-  pinBtn.off() 
+  pinPaddle.on()
+  pinBtn.off()
   sleep_ms(20)
   return adc.read()
-  
+
 def pressed (btn, waitRelease=False) :
   global Btns
-  if waitRelease :
-    pinPaddle.off() 
-    pinBtn.on() 
+  if waitRelease and Btns :
+    pinPaddle.off()
+    pinBtn.on()
     while ADC(0).read() > 70 :
        sleep_ms (20)
-  return (Btns & 1 << btn)
-  
+  return (Btns & btn)
+
 def lastpressed (btn) :
   global lastBtns
-  return (lastBtns & 1 << btn)
+  return (lastBtns & btn)
 
 
 def getBtn () :
@@ -91,43 +91,43 @@ def getBtn () :
     if a0 < 361 :
       if a0 > 192 :
         if a0 > 278 :
-          Btns |= 1 << btnU | 1 << btnA
+          Btns |= btnU | btnA
         else :
-          Btns |= 1 << btnL        
+          Btns |= btnL
       else:
         if a0 > 70 :
-          Btns |= 1 << btnU
+          Btns |= btnU
     else :
       if a0 > 482 :
         if a0 > 527 :
-          Btns |= 1 << btnD   
+          Btns |= btnD
         else :
-          Btns |= 1 << btnU | 1 << btnB 
-      else:  
+          Btns |= btnU | btnB
+      else:
         if a0 > 440 :
-          Btns |= 1 << btnL | 1 << btnA 
+          Btns |= btnL | btnA
         else :
-          Btns |= 1 << btnR   
+          Btns |= btnR
   else:
       if a0 < 728 :
         if a0 < 653 :
           if a0 > 609 :
-            Btns |= 1 << btnD | 1 << btnA 
+            Btns |= btnD | btnA
           else :
-            Btns |= 1 << btnR | 1 << btnA 
+            Btns |= btnR | btnA
         elif a0 > 675 :
-          Btns |= 1 << btnA  
+          Btns |= btnA
         else :
-          Btns |= 1 << btnL | 1 << btnB
+          Btns |= btnL | btnB
       elif a0 < 829 :
         if a0 > 794 :
-          Btns |= 1 << btnD | 1 << btnB
-        else : 
-          Btns |= 1 << btnR | 1 << btnB  
-      elif a0 > 857 : 
-        Btns |= 1 << btnB            
+          Btns |= btnD | btnB
+        else :
+          Btns |= btnR | btnB
+      elif a0 > 857 :
+        Btns |= btnB
       else :
-        Btns |= 1 << btnA | 1 << btnB    
+        Btns |= btnA | btnB
 
 
 
@@ -172,10 +172,10 @@ def playSound(freq, tone_duration, total_duration):
             beeper.deinit()
             utime.sleep_ms(int(total_duration * 1000)-tone_duration)
 
-
 SCREEN_WIDTH  = const(128)
 SCREEN_HEIGHT = const(64)
 paddle_width = 22
+frameRate = 30
 
 class Ball(object):
     """Ball."""
@@ -280,8 +280,8 @@ class Brick(object):
             x, y (int):  X,Y coordinates.
             color (string):  Blue, Green, Pink, Red or Yellow.
             display (SSD1351): OLED display.
-            width (Optional int): Blick width 
-            height (Optional int): Blick height 
+            width (Optional int): Blick width
+            height (Optional int): Blick height
         """
         self.x = x
         self.y = y
@@ -362,7 +362,7 @@ class Life(object):
         Args:
             index (int): Life number (1-based).
             display (SSD1351): OLED display.
-            width (Optional int): Life width 
+            width (Optional int): Life width
             height (Optional int): Life height
         """
         margin = 5
@@ -391,8 +391,8 @@ class Paddle(object):
 
         Args:
             display (SSD1306): OLED display.
-            width (Optional int): Paddle width 
-            height (Optional int): Paddle height 
+            width (Optional int): Paddle width
+            height (Optional int): Paddle height
         """
         self.x = 55
         self.y = 60
@@ -448,8 +448,8 @@ class Score(object):
         """
         margin = 5
         self.display = display
-        self.display.text('SCORE:', margin, 0, 1)
-        self.x = 50 + margin
+        self.display.text('S:', margin, 0, 1)
+        self.x = 20 + margin
         self.y = 0
         self.value = 0
         self.draw()
@@ -458,7 +458,7 @@ class Score(object):
         """Draw score value."""
         self.display.fill_rect(self.x, self.y, 20, 8, 0)
         self.display.text( str(self.value), self.x, self.y,1)
-        
+
     def game_over(self):
         """Display game_over."""
         self.display.text('GAME OVER', (self.display.width // 2) - 30,
@@ -468,17 +468,18 @@ class Score(object):
         """Increase score by specified points."""
         self.value += points
         self.draw()
-  
-def load_level(level, display) :
 
+def load_level(level, display) :
+    frameRate = 25 + level * 5    
     bricks = []
     for row in range(12, 20 + 6 * level , 6):
         brick_color = 1
         for col in range(8, 112, 15 ):
-            bricks.append(Brick(col, row, brick_color, display))    
+            bricks.append(Brick(col, row, brick_color, display))
+    
     return bricks
-    
-    
+
+
 
 
 
@@ -489,32 +490,44 @@ while not exitGame :
 
     gc.collect()
     print (gc.mem_free())
-    
+
     display.fill(0)
     display.text('BREAKOUT', 5, 0, 1)
-    display.text('U = Button', 5, 20, 1)
-    display.text('D = Paddle', 5, 35,  1)
+    display.text('A = Button', 5, 20, 1)
+    display.text('B = Paddle', 5,30,  1)
+    display.text('D = Demo', 5, 40,  1)
     display.text('L = Exit', 5, 50,  1)
     display.show()
     gameover = False
     wait_for_keys= True
     usePaddle = False
+    demo = False
     while wait_for_keys:
       getBtn()
       if pressed(btnL,True) :
         wait_for_keys=False
         exitGame = True
         game_over = True
-      elif pressed(btnU,True) :
+      elif pressed(btnA,True) :
         wait_for_keys = False
         usePaddle = False
-      elif pressed(btnD,True) :
+      elif pressed(btnB,True) :
         usePaddle = True
         wait_for_keys=False
-        
+      elif pressed(btnD,True) :
+        demo = True
+        usePddle = False
+        wait_for_keys=False
+        display.fill(0)
+        display.text('DEMO', 5, 0, 1)
+        display.text('A or B to Stop', 5, 30, 1)
+        display.show()
+        sleep_ms(2000)  
+
+      
     if not exitGame :
       display.fill(0)
-       
+
       # Generate bricks
       MAX_LEVEL = const(5)
       level = 1
@@ -535,9 +548,9 @@ while not exitGame :
       lives = []
       for i in range(1, 3):
           lives.append(Life(i, display))
-      
+
       prev_paddle_vect = 0
-     
+
 
       display.show()
 
@@ -549,24 +562,30 @@ while not exitGame :
                   paddle.h_position(int(getPaddle() // 9.57))
               else :
                   getBtn()
-                  paddle_vect = 0
-                  if pressed(btnL):
-                    paddle_vect = -1                      
-                  elif pressed(btnR) or pressed(btnA):
-                    paddle_vect = 1   
-                  if paddle_vect != prev_paddle_vect :
-                    paddle_vect *= 3
-                  else :
-                    paddle_vect *= 5
-                  paddle.h_position(paddle.x + paddle_vect)
-                  prev_paddle_vect = paddle_vect
-                    
+                  if demo :
+                    if Btns & (btnA | btnB) :
+                      gameover = True
+                    else :
+                      paddle.h_position(balls[0].x - 8 + getrandbits(3))
+                  else :  
+                    paddle_vect = 0
+                    if Btns & (btnL | btnA) :
+                      paddle_vect = -1
+                    elif Btns & (btnR | btnB) :
+                      paddle_vect = 1
+                    if paddle_vect != prev_paddle_vect :
+                      paddle_vect *= 3
+                    else :
+                      paddle_vect *= 5
+                    paddle.h_position(paddle.x + paddle_vect)
+                    prev_paddle_vect = paddle_vect
+
                # Handle balls
               score_points = 0
               for ball in balls:
-                  # move ball and check if bounced off walls and paddle 
+                  # move ball and check if bounced off walls and paddle
                   if ball.set_position(paddle.x, paddle.y,paddle.x2, paddle.center):
-                      playSound(2000, 10, 0.001)     
+                      playSound(2000, 10, 0.001)
                   # Check for collision with bricks if not frozen
                   if not ball.frozen:
                       prior_collision = False
@@ -576,7 +595,7 @@ while not exitGame :
                       ball_y2 = ball.y2
                       ball_center_x = ball.x + ((ball.x2 + 1 - ball.x) // 2)
                       ball_center_y = ball.y + ((ball.y2 + 1 - ball.y) // 2)
-                      
+
                       # Check for hits
                       for brick in bricks:
                           if(ball_x2 >= brick.x and
@@ -594,7 +613,7 @@ while not exitGame :
                                       ball.y_speed,
                                       ball_center_x,
                                       ball_center_y)
-                                  playTone('c6', 10, 0.001)    
+                                  playTone('c6', 10, 0.001)
                                   prior_collision = True
                               score_points += 1
                               brick.clear()
@@ -624,7 +643,7 @@ while not exitGame :
               # Update score if changed
               if score_points:
                   score.increment(score_points)
-              
+
               # Check for level completion
               if not bricks:
                   for ball in balls:
@@ -641,28 +660,17 @@ while not exitGame :
                   playTone('e5', 20, 0.02)
                   playTone('f5', 20, 0.02)
                   playTone('g5', 20, 0.02)
-                  playTone('a5', 20, 0.02)                  
+                  playTone('a5', 20, 0.02)
                   playTone('b5', 20, 0.02)
-                  playTone('c6', 20, 0.02)         
+                  playTone('c6', 20, 0.02)
               display.show()
               # Attempt to set framerate to 30 FPS
-              timer_dif = int(1000 / 30) - ticks_diff(ticks_ms(), timer)
-              if timer_dif > 0:
+              timer_dif = int(1000/frameRate) - ticks_diff(ticks_ms(), timer)
+              if timer_dif > 0 :
                   sleep_ms(timer_dif)
       except KeyboardInterrupt:
           display.cleanup()
-      
+
       sleep_ms(2000)
-
-
-
-
-
-
-
-
-
-
-
 
 
