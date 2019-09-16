@@ -1,3 +1,25 @@
+# ----------------------------------------------------------
+#  Breakout Game 
+#  ESP8266 (node MCU D1 mini)  micropython
+# by Billy Cheung  2019 08 31
+#
+# SPI OLED 
+# GND
+# VCC
+# D0/Sck - D5 (=GPIO14=HSCLK)
+# D1/MOSI- D7 (=GPIO13=HMOSI)
+# RES    - D0 (=GPIO16)
+# DC     - D4 (=GPIO2)
+# CS     - D3 (=GPIO0)
+# Speaker
+# GPIO15   D8  Speaker
+# n.c.   - D6  (=GPIO13=HMOSI)
+#
+# GPIO5    D1——   On to read ADC for Btn
+# GPIO4    D2——   On to read ADC for Paddle
+#
+# buttons   A0
+# A0 VCC-9K-U-9K-L-12K-R-9K-D-9K-A-12K-B-9K-GND 
 import gc
 import sys
 gc.collect()
@@ -13,11 +35,9 @@ from random import getrandbits, seed
 # configure oled display SPI SSD1306
 hspi = SPI(1, baudrate=8000000, polarity=0, phase=0)
 #DC, RES, CS 
-display = ssd1306.SSD1306_SPI(128, 64, hspi, Pin(2), Pin(16), Pin(5)) 
+display = ssd1306.SSD1306_SPI(128, 64, hspi, Pin(2), Pin(16), Pin(0)) 
 
-SCREEN_WIDTH  = const(128)
-SCREEN_HEIGHT = const(64)
-paddle_width = 22
+
 
 #---buttons
 
@@ -31,7 +51,7 @@ btnB = 6
 Btns = 0
 lastBtns = 0
 
-pinBtn = Pin(0, Pin.OUT)
+pinBtn = Pin(5, Pin.OUT)
 pinPaddle = Pin(4, Pin.OUT)
 
 
@@ -153,6 +173,9 @@ def playSound(freq, tone_duration, total_duration):
             utime.sleep_ms(int(total_duration * 1000)-tone_duration)
 
 
+SCREEN_WIDTH  = const(128)
+SCREEN_HEIGHT = const(64)
+paddle_width = 22
 
 class Ball(object):
     """Ball."""
